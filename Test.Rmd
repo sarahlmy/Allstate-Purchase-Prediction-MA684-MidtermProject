@@ -8,7 +8,7 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load("dplyr", "ggplot2")
+pacman::p_load("dplyr", "ggplot2", "grid", "gridExtra")
 ```
 
 # 1. Introduction
