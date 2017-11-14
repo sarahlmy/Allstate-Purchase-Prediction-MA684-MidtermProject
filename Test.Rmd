@@ -68,3 +68,27 @@ ggplot(data=data.count)+
   geom_histogram(mapping=aes(x=risk_factor, fill = car_value), bins=15)
 ```
 
+```{r,fig.height=20,fig.width=20}
+cost <- data_new%>%
+  select(cost,risk_factor,homeowner,car_age,car_value,married_couple,age_oldest,age_youngest,C_previous,group_size,shopping_pt,duration_previous)
+rk.fig <- ggplot(cost,aes(x = factor(risk_factor),y = cost)) + geom_violin() +geom_boxplot(width = 0.2)
+hm.fig <- ggplot(cost,aes(x = factor(homeowner),y = cost)) + geom_violin() +geom_boxplot(width = 0.3)
+mr.fig <- ggplot(cost,aes(x = factor(married_couple),y = cost)) + geom_violin() +geom_boxplot(width = 0.3)
+cv.fig <- ggplot(cost,aes(x = factor(car_value),y = cost)) + geom_violin() +geom_boxplot(width = 0.15)
+Cp.fig <- ggplot(cost,aes(x = factor(C_previous),y = cost)) + geom_violin() +geom_boxplot(width = 0.3)
+gz.fig <- ggplot(cost,aes(x = factor(group_size),y = cost)) + geom_violin() +geom_boxplot(width = 0.15)
+grid.arrange(rk.fig,hm.fig,mr.fig,cv.fig,Cp.fig,gz.fig,ncol=2)
+```
+
+```{r,fig.height=15,fig.width=15}
+ca.fig <- ggplot(cost) + geom_point(aes(x = car_age, y = cost),color = "navy") + geom_smooth(aes(x = car_age, y = cost), method = "lm",color = "orange")
+cv.fig.2 <- ggplot(cost) + geom_point(aes(x = car_value, y = cost),color = "navy")
+
+sh.fig <- ggplot(cost) + geom_point(aes(x = shopping_pt, y = cost),color = "navy") + geom_smooth(aes(x = shopping_pt, y = cost), method = "lm",color = "orange")
+du.fig <- ggplot(cost) + geom_point(aes(x = duration_previous, y = cost),color = "navy") + geom_smooth(aes(x = duration_previous, y = cost), method = "lm",color = "orange")
+grid.arrange(ca.fig,cv.fig.2,sh.fig,du.fig,ncol=2)
+```
+
+```{r}
+age.fig <- ggplot(cost) + geom_point(aes(x = age_oldest, y = cost),color = "gray") + geom_smooth(aes(x = age_oldest, y = cost), method = "lm",color = "navy") + geom_point(aes(x = age_youngest, y = cost),color = "pink") + geom_smooth(aes(x = age_youngest, y = cost), method = "lm",color = "orange")
+age.fig
