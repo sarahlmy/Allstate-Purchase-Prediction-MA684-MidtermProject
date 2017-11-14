@@ -8,7 +8,7 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load("dplyr")
+pacman::p_load("dplyr", "ggplot2")
 ```
 
 # 1. Introduction
@@ -22,8 +22,10 @@ As a customer shops an insurance policy, he/she will receive a number of quotes 
 ```{r}
 #Data clean
 data_test <- read.csv("test_v2.csv")
+#data_test$car_value <-gsub(pattern=NULL, replacement=NA, x= data_test$car_value)
+#levels(data_test$car_value)[levels(data_test$car_value)=="/s"] <- "NA"
 data_test <- na.omit(data_test)
-data_new <- data_test[5:12004, ] 
+data_new <- data_test[1:12000, ] 
 head(data_new, n=5)
 ```
 
@@ -48,9 +50,21 @@ duration_previous -  how long (in years) the customer was covered by their previ
 A,B,C,D,E,F,G - the coverage options  
 cost - cost of the quoted coverage options  
 
+## 2.3 Goal of analysis
+Use multilevel linear model to find the relationship between different kinds of customer with the quote price of car insurance.
+
 # 3. Exploratory Data Analysis
 
+## 3.1 Data Visuallization
 
-## 3.1 Visuallization of the Data
+#### Numbers of customers in each risk factor (fill by different car value).
+```{r}
+data.count <- data_new%>%
+  select(customer_ID,risk_factor,car_value)%>%
+  count(customer_ID,risk_factor, car_value)%>%
+  group_by(customer_ID)
 
+ggplot(data=data.count)+
+  geom_histogram(mapping=aes(x=risk_factor, fill = car_value), bins=15)
+```
 
