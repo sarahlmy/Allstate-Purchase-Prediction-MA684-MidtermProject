@@ -1,0 +1,94 @@
+---
+title: "684 Midterm Project Proposal"
+subtitle: "Allstate Purchase Prediction"
+author: "Mengyun Li"
+date: "November 13, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load("dplyr", "ggplot2", "grid", "gridExtra")
+```
+
+# 1. Introduction
+
+As a customer shops an insurance policy, he/she will receive a number of quotes with different coverage options before purchasing a plan. This is represented in this challenge as a series of rows that include a customer ID, information about the customer, information about the quoted policy, and the cost. The task is to predict the purchased coverage options using a limited subset of the total interaction history.
+
+# 2. Data and Method
+
+## 2.1 Data Source
+
+```{r}
+#Data clean
+data_test <- read.csv("test_v2.csv")
+#data_test$car_value <-gsub(pattern=NULL, replacement=NA, x= data_test$car_value)
+#levels(data_test$car_value)[levels(data_test$car_value)=="/s"] <- "NA"
+data_test <- na.omit(data_test)
+data_new <- data_test[1:12000, ] 
+head(data_new, n=5)
+```
+
+## 2.2 Variable Discriptions
+customer_ID - A unique identifier for the customer  
+shopping_pt - Unique identifier for the shopping point of a given customer  
+record_type - 0=shopping point, 1=purchase point  
+day - Day of the week (0-6, 0=Monday)  
+time - Time of day (HH:MM)  
+state - State where shopping point occurred  
+location - Location ID where shopping point occurred  
+group_size - How many people will be covered under the policy (1, 2, 3 or 4)  
+homeowner - Whether the customer owns a home or not (0=no, 1=yes)  
+car_age - Age of the customer¡¯s car  
+car_value - How valuable was the customer¡¯s car when new  
+risk_factor - An ordinal assessment of how risky the customer is (1, 2, 3, 4)  
+age_oldest - Age of the oldest person in customer's group  
+age_youngest - Age of the youngest person in customer¡¯s group  
+married_couple - Does the customer group contain a married couple (0=no, 1=yes)  
+C_previous - What the customer formerly had or currently has for product option C (0=nothing, 1, 2, 3,4)  
+duration_previous -  how long (in years) the customer was covered by their previous issuer
+A,B,C,D,E,F,G - the coverage options  
+cost - cost of the quoted coverage options  
+
+## 2.3 Goal of analysis
+Use multilevel linear model to find the relationship between different kinds of customer with the quote price of car insurance.
+
+# 3. Exploratory Data Analysis
+
+## 3.1 Data Visuallization
+
+#### Numbers of customers in each risk factor (fill by different car value).
+```{r}
+data.count <- data_new%>%
+  select(customer_ID,risk_factor,car_value)%>%
+  count(customer_ID,risk_factor, car_value)%>%
+  group_by(customer_ID)
+
+ggplot(data=data.count)+
+  geom_histogram(mapping=aes(x=risk_factor, fill = car_value), bins=15)
+```
+
+```{r,fig.height=20,fig.width=20}
+cost <- data_new%>%
+  select(cost,risk_factor,homeowner,car_age,car_value,married_couple,age_oldest,age_youngest,C_previous,group_size,shopping_pt,duration_previous)
+rk.fig <- ggplot(cost,aes(x = factor(risk_factor),y = cost)) + geom_violin() +geom_boxplot(width = 0.2)
+hm.fig <- ggplot(cost,aes(x = factor(homeowner),y = cost)) + geom_violin() +geom_boxplot(width = 0.3)
+mr.fig <- ggplot(cost,aes(x = factor(married_couple),y = cost)) + geom_violin() +geom_boxplot(width = 0.3)
+cv.fig <- ggplot(cost,aes(x = factor(car_value),y = cost)) + geom_violin() +geom_boxplot(width = 0.15)
+Cp.fig <- ggplot(cost,aes(x = factor(C_previous),y = cost)) + geom_violin() +geom_boxplot(width = 0.3)
+gz.fig <- ggplot(cost,aes(x = factor(group_size),y = cost)) + geom_violin() +geom_boxplot(width = 0.15)
+grid.arrange(rk.fig,hm.fig,mr.fig,cv.fig,Cp.fig,gz.fig,ncol=2)
+```
+
+```{r,fig.height=15,fig.width=15}
+ca.fig <- ggplot(cost) + geom_point(aes(x = car_age, y = cost),color = "navy") + geom_smooth(aes(x = car_age, y = cost), method = "lm",color = "orange")
+cv.fig.2 <- ggplot(cost) + geom_point(aes(x = car_value, y = cost),color = "navy")
+
+sh.fig <- ggplot(cost) + geom_point(aes(x = shopping_pt, y = cost),color = "navy") + geom_smooth(aes(x = shopping_pt, y = cost), method = "lm",color = "orange")
+du.fig <- ggplot(cost) + geom_point(aes(x = duration_previous, y = cost),color = "navy") + geom_smooth(aes(x = duration_previous, y = cost), method = "lm",color = "orange")
+grid.arrange(ca.fig,cv.fig.2,sh.fig,du.fig,ncol=2)
+```
+
+```{r}
+age.fig <- ggplot(cost) + geom_point(aes(x = age_oldest, y = cost),color = "gray") + geom_smooth(aes(x = age_oldest, y = cost), method = "lm",color = "navy") + geom_point(aes(x = age_youngest, y = cost),color = "pink") + geom_smooth(aes(x = age_youngest, y = cost), method = "lm",color = "orange")
+age.fig

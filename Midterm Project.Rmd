@@ -1,0 +1,34 @@
+---
+title: "MA 684 Midterm Project"
+author: "Mengyun Li"
+date: "November 29, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(ggplot2)
+```
+
+#1. Introduction
+
+#Data
+```{r}
+#Remove the column with NA.
+train <- read_csv("train.csv")
+train <- na.omit(train)
+head(train, n=9)
+```
+As a customer shops an insurance policy, he/she will receive a number of quotes with different coverage options before purchasing a plan. From the data above, a customer with ID 10000000 recieved nine quote and purchased the last one.
+
+```{r}
+#Select quotes which customer purchased
+purchase <- train[train$record_type=="1", ]
+head(purchase, n=3)
+
+ggplot(purchase, aes(x=shopping_pt)) +geom_bar()
+
+```
+
