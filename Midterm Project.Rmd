@@ -6,7 +6,7 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE,warning=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 library(readr)
 library(dplyr)
 library(ggplot2)
@@ -88,7 +88,7 @@ option.fig8 <- ggplot(train, aes(G, fill=factor(record_type)))+geom_bar(alpha=0.
 title1=textGrob("Figure 3.1: Percentage of purchase for each option", gp=gpar(fontsize=40,font=3))
 grid.arrange(option.fig1, option.fig2, option.fig3, option.fig4, option.fig5, option.fig6, option.fig7, option.fig8, top=title1)
 ```
-From the figure above I found that customers has not much difference in choosing each options. Also most of customers need more than five quotes then finally purchase.
+From the figure above I found that customers has not much difference in choosing each options. (No preferece in certain one option.) Also most of customers need more than five quotes then finally purchase.
 
 ## 3.2 The comparasion between previous option C and option C
 ```{r}
@@ -99,14 +99,19 @@ title2=textGrob("Figure 3.2: Percentage of each option in option C", gp=gpar(fon
 grid.arrange(c.fig1, c.fig2, ncol=2, top=title2)
 
 ```
-
+From Figure 3.3 I found that there are not much difference in the amount of each option in category C, the number of people who choose option 3 decreased while the number of person who choose option 2 increased. 
 
 ## 3.3 The relation ship between the oldest age in one group and the cost.
 ```{r}
-age.fig <- ggplot(purchase) + geom_jitter(aes(x = age_oldest, y = cost),color = "gray") + geom_smooth(aes(x = age_oldest, y = cost), method = "lm",color = "navy") + geom_point(aes(x = age_youngest, y = cost),color = "pink") + geom_smooth(aes(x = age_youngest, y = cost), method = "lm",color = "orange")
-age.fig
-```
+age.fig1 <- ggplot(purchase) + geom_jitter(aes(x = age_oldest, y = cost),color = "gray") + geom_smooth(aes(x = age_oldest, y = cost), method = "lm",color = "navy") + geom_point(aes(x = age_youngest, y = cost),color = "pink") + geom_smooth(aes(x = age_youngest, y = cost), method = "lm",color = "orange")
+age.fig2 <- ggplot(purchase) + geom_jitter(aes(x = car_value, y = cost),color = "gray") + geom_smooth(aes(x = car_value, y = cost), method = "lm",color = "orange")
+age.fig3 <- ggplot(purchase) + geom_jitter(aes(x = car_age, y = cost),color = "gray") + geom_smooth(aes(x = car_age, y = cost), method = "lm",color = "orange")
+age.fig4 <- ggplot(purchase) + geom_jitter(aes(x = risk_factor, y = cost),color = "gray") + geom_smooth(aes(x = risk_factor, y = cost), method = "lm",color = "orange")
 
+title3=textGrob("Figure 3.4: Percentage of each option in option C", gp=gpar(fontsize=15,font=3))
+grid.arrange(age.fig1, age.fig2, age.fig3, age.fig4, top=title3)
+```
+From Figure 3.4 I found that the insurance cost will have lighly increase while the group age, car_value and risk factor increased. Also the cost has very obvious decreasing while the car_age is increased.
 
 
 ## 3.4 Number of customers in each state
@@ -130,15 +135,15 @@ gg <- gg + geom_map(data=state_count, map=us,
                     color="#ffffff", size=0.15)
 gg <- gg + scale_fill_continuous(low='thistle2', high='darkred', 
                                  guide='colorbar')
-gg <- gg + labs(x=NULL, y=NULL) + coord_map("albers", lat0 = 39, lat1 = 45) + theme(panel.border = element_blank()) + theme(panel.background = element_blank()) + theme(axis.ticks = element_blank()) + theme(axis.text = element_blank())
+gg <- gg + labs(x=NULL, y=NULL) + coord_map("albers", lat0 = 39, lat1 = 45) + theme(panel.border = element_blank()) + theme(panel.background = element_blank()) + theme(axis.ticks = element_blank()) + theme(axis.text = element_blank())+ ggtitle("Figure 3.4  Chloropleth map of amount of customer in each states")
 gg
 
 
 ```
-
+From figure 3.4 we can see there is a large difference between the number of customers in each state. Thus for next step I will put state as a radom effecto for the multilevel generalized linear model.
 
 # 4. Model Analysis
-##4.1 Multilevel generalized linear model.
+##4.1 Multilevel linear model for option C
 First I want to find out the relationship between the option C each customer finally chose with the option C they chosen before. 
 
 $C_i = Group\_Size_{j[i]} + State_{k[i]} + Car\_Value_i + Risk\_Factor_i + Married\_Couple_i + C\_Previous_i + \epsilon_i$
@@ -164,22 +169,91 @@ binnedplot(y_hat.1,res.1)
 y_hat.2 <- fitted.values(c_purchase2)
 res.2 <- resid(c_purchase1, type = "response")
 binnedplot(y_hat.2,res.2)
-```
 
-## 4.2 Purchase prediction with previous c option
+anova(c_purchase1, c_purchase2)
+```
+1. The AIC is lower while I add C_previous to the model, this prove that the previous option on C will influence the final purchase on option C.
+2. The variance of random effect (predictor state and group_size) in model 2 is larger than model 1, this shows that the random effect has more influence to this model.
+
+## 4.2 Logistical model for purchase prediction with previous c option
+
+Next I will predict the combination of the options by fit the data into multilevel logistic regression model. I will use two partial pooling model, one is random intercept, the other is random intercept and random slope.
+
+$Prob(record\_type = 1) = logit^{-1}(Plan_{j[i]} + Duration\_Previous_i + shopping\_point_i + C\_Previous_i + \epsilon_i)$
+$\epsilon_i \sim N(0,\sigma^2_C)$
+$Plan_j \sim N(\mu_{Plan},\sigma^2_{Plan})$
+
+
 ```{r}
 train$plan <- paste0(train$A, train$B, train$C, train$D, train$E, train$F, train$G)
 train$plan <- as.factor(train$plan)
 
+#Random select 10000 rows of data, incase the dataset too large
 test <- train[sample(1:nrow(train), 10000,replace=FALSE),]
 
-predict.1 <- glmer(record_type ~ C_previous + duration_previous  +(1 | plan), data=test, family = binomial, control = glmerControl(optimizer = "bobyqa"),nAGQ = 10)
+predict.1 <- glmer(record_type ~ C_previous + duration_previous + shopping_pt  +(1 | plan), data=test, family = binomial, control = glmerControl(optimizer = "bobyqa"),nAGQ = 10)
 summary(predict.1)
+
 y_hat.3 <- fitted.values(predict.1)
 res.3 <- resid(predict.1, type = "response")
-binnedplot(y_hat.3,res.3)
+binnedplot(y_hat.3,res.3) #Residual Plot for predict model
+
+se1 <- sqrt(diag(vcov(predict.1))) 
+tab1 <- cbind(Est = fixef(predict.1), LL = fixef(predict.1) - 1.96 * se1, UL = fixef(predict.1) + 1.96 *se1)
+tab0 <- tab1 
+kable(tab1)
+tab1 <- data.frame(tab1)
+tab1$model <- c("model1")
 ```
 
 
 
+```{r}
+#Random Intercept and random slope for the variable plan.
+predict.2 <- glmer(record_type ~ C_previous + duration_previous + shopping_pt  +(1 + duration_previous | plan), data=test, family = binomial, control = glmerControl(optimizer = "bobyqa"))
+summary(predict.2)
 
+y_hat.4 <- fitted.values(predict.2)
+res.4 <- resid(predict.2, type = "response")
+binnedplot(y_hat.4,res.4)
+
+se2 <- sqrt(diag(vcov(predict.2))) 
+tab2 <- cbind(Est = fixef(predict.2), LL = fixef(predict.2) - 1.96 * se2, UL = fixef(predict.2) + 1.96 *se2)
+kable(tab2)
+```
+
+
+```{r}
+#Make a bar plot with error bars to compare the standard error of two model.
+tab2 <- data.frame(tab2)
+tab2$model <- c("model2")
+tab <- rbind(tab1, tab2)
+tab$name <- rownames(tab)
+tab <- tab[-1, ] #Remove the intercept (too large)
+tab <- tab[-4, ]
+ggplot(tab, aes(x=name, y=Est, fill=model)) + 
+    geom_bar(position=position_dodge(), stat="identity", width = 0.4) +
+    geom_errorbar(aes(ymin=LL, ymax=UL),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.5))+ ggtitle("Figure 4.1 Means and error bars for coefficient ")
+
+anova(predict.1, predict.2)
+```
+
+From the figure 4.1 we can see that two model and similar standard error and there is not much difference between the two models with random intercept and random intercept + random slope. The conclusion is also proved by the anova, thus I will choose predict.1 as my model.
+
+
+
+# 5. Conclusion
+Fixed effects:
+                   Estimate Std. Error z value Pr(>|z|)    
+(Intercept)       -5.037206   0.143582  -35.08   <2e-16 ***
+C_previous        -0.012769   0.032929   -0.39    0.698    
+duration_previous  0.008424   0.006752    1.25    0.212    
+shopping_pt        0.607017   0.016325   37.18   <2e-16 ***
+
+From the coefficient of the prediction.1 we can see the probability of accept the quote will decrease -0.0032 when the customer chose option 2 instead of 1 in previous C. The probability will increase 0.002106 while add one unit in duration_previous. The probablity of purchase will increase 0.15175 while get one more quote.
+
+
+## Comment
+This dataset is not complete and lack the data for those customors who end up without purchase any insurance, thus I can not fit an accurate model and make prediction from it.
