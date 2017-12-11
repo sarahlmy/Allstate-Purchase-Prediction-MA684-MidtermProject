@@ -99,9 +99,19 @@ title2=textGrob("Figure 3.2: Percentage of each option in option C", gp=gpar(fon
 grid.arrange(c.fig1, c.fig2, ncol=2, top=title2)
 
 ```
-From Figure 3.3 I found that there are not much difference in the amount of each option in category C, the number of people who choose option 3 decreased while the number of person who choose option 2 increased. 
+From Figure 3.3 I found that there are not much difference in the amount of each option in category C, the number of people who choose option 3 decreased while the number of person who choose option 2 increased.
 
-## 3.3 The relation ship between the oldest age in one group and the cost.
+##3.3 Comparasion to option C-previous and option C
+```{r}
+optionc_1 <- purchase %>%
+  group_by(C_previous) %>%
+  count(C)
+
+ggplot()+geom_bar(optionc_1, mapping=aes(x=factor(C_previous), y=n, fill=factor(C)),stat = "identity", position="fill", alpha=0.7) + labs(title="Figure3.3 The count of option C for each C-previous", x= "", y="Count")
+```
+From this figure, we can find that for customer who chose option 1 in C before, will mostly choose option 1 in C thereafter, so as other 3 otpions.  
+
+## 3.4 The relation ship between the oldest age in one group and the cost.
 ```{r}
 age.fig1 <- ggplot(purchase) + geom_jitter(aes(x = age_oldest, y = cost),color = "gray") + geom_smooth(aes(x = age_oldest, y = cost), method = "lm",color = "navy") + geom_point(aes(x = age_youngest, y = cost),color = "pink") + geom_smooth(aes(x = age_youngest, y = cost), method = "lm",color = "orange")
 age.fig2 <- ggplot(purchase) + geom_jitter(aes(x = car_value, y = cost),color = "gray") + geom_smooth(aes(x = car_value, y = cost), method = "lm",color = "orange")
@@ -114,7 +124,7 @@ grid.arrange(age.fig1, age.fig2, age.fig3, age.fig4, top=title3)
 From Figure 3.4 I found that the insurance cost will have lighly increase while the group age, car_value and risk factor increased. Also the cost has very obvious decreasing while the car_age is increased.
 
 
-## 3.4 Number of customers in each state
+## 3.5 Number of customers in each state
 ```{r, warning=FALSE}
 state_count<- purchase %>%
   count(state)
@@ -140,7 +150,7 @@ gg
 
 
 ```
-From figure 3.4 we can see there is a large difference between the number of customers in each state. Thus for next step I will put state as a radom effecto for the multilevel generalized linear model.
+From figure 3.5 we can see there is a large difference between the number of customers in each state. Thus for next step I will put state as a radom effecto for the multilevel generalized linear model.
 
 # 4. Model Analysis
 ##4.1 Multilevel linear model for option C
@@ -151,6 +161,9 @@ $C_i \sim N(\mu_C,\sigma^2_C)$
 $\epsilon_i \sim N(0,\sigma^2_C)$
 $Group\_Size_j \sim N(\mu_{Group\_Size},\sigma^2_{Group\_Size})$
 $State_k \sim N(\mu_{State},\sigma^2_{State})$
+
+
+
 
 ```{r,warning=FALSE}
 #Fit the multilevel generalized linear model of option C with the predictor c_previous
@@ -164,20 +177,21 @@ summary(c_purchase2)
 #Find the fitted value and residules of this two model
 y_hat.1 <- fitted.values(c_purchase1)
 res.1 <- resid(c_purchase1, type = "response")
-binnedplot(y_hat.1,res.1)
+binnedplot(y_hat.1,res.1, main = "Figure 4.1: Binned residule plot for model 2")
 
 y_hat.2 <- fitted.values(c_purchase2)
 res.2 <- resid(c_purchase1, type = "response")
-binnedplot(y_hat.2,res.2)
+binnedplot(y_hat.2,res.2, main = "Figure 4.1: Binned residule plot for model 2")
 
 anova(c_purchase1, c_purchase2)
 ```
-1. The AIC is lower while I add C_previous to the model, this prove that the previous option on C will influence the final purchase on option C.
-2. The variance of random effect (predictor state and group_size) in model 2 is larger than model 1, this shows that the random effect has more influence to this model.
+1) From the comparasion of the residule plot for this two model, the second model is more accurate since the point is pretty symmetrically distributed, tending to cluster towards the middle of the plot.
+2) The AIC of the second model is larger than first one, shows this perspective the first model is more reasonable.
+3) From all of the output above, I conclude that the predict model without previous C option will be better, thus I won't include previous C option as my predictor during my further analysis.
 
 ## 4.2 Logistical model for purchase prediction with previous c option
 
-Next I will predict the combination of the options by fit the data into multilevel logistic regression model. I will use two partial pooling model, one is random intercept, the other is random intercept and random slope.
+Next I will predict the combination of the options by fit the data into multilevel logistic regression model. I will compare two partial pooling model, one is random intercept, the other is random intercept and random slope. 
 
 $Prob(record\_type = 1) = logit^{-1}(Plan_{j[i]} + Duration\_Previous_i + shopping\_point_i + C\_Previous_i + \epsilon_i)$
 $\epsilon_i \sim N(0,\sigma^2_C)$
@@ -257,3 +271,9 @@ From the coefficient of the prediction.1 we can see the probability of accept th
 
 ## Comment
 This dataset is not complete and lack the data for those customors who end up without purchase any insurance, thus I can not fit an accurate model and make prediction from it.
+
+
+```{r}
+
+```
+
