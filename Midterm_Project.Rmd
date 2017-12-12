@@ -1,0 +1,264 @@
+---
+title: "MA 684 Midterm Project"
+author: "Mengyun Li"
+date: "November 29, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE,warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(lme4)
+library(MASS)
+library(gridExtra)
+library(grid)
+library(arm)
+library(plotrix)
+```
+
+#1. Introduction
+I use the allstate insurance purchase history as the dataset of this project. As a customer shops an insurance policy, he/she will receive a number of quotes with different coverage options before purchasing a plan. This is represented in this data as a series of rows that include a customer ID, information about the customer, information about the quoted policy, and the cost. The task of this project is to predict the purchased coverage options using a limited subset of the total interaction history.
+
+#2. Description of the data
+```{r}
+#Remove the column with NA.
+train <- read_csv("train.csv")
+train <- na.omit(train)
+kable(head(train, n=9))
+```
+##Variable Description
+There are total 25 variables for this data and with the variables descriptions as follow:
+
+customer_ID - A unique identifier for the customer\newline
+shopping_pt - Unique identifier for the shopping point of a given customer\newline
+record_type - 0=shopping point, 1=purchase point\newline
+day - Day of the week (0-6, 0=Monday)\newline
+time - Time of day (HH:MM)\newline
+state - State where shopping point occurred\newline
+location - Location ID where shopping point occurred\newline
+group_size - How many people will be covered under the policy (1, 2, 3 or 4)\newline
+homeowner - Whether the customer owns a home or not (0=no, 1=yes)\newline
+car_age - Age of the customer¡¯s car\newline
+car_value - How valuable was the customer¡¯s car when new\newline
+risk_factor - An ordinal assessment of how risky the customer is (1, 2, 3, 4)\newline
+age_oldest - Age of the oldest person in customer's group\newline
+age_youngest - Age of the youngest person in customer¡¯s group\newline
+married_couple - Does the customer group contain a married couple (0=no, 1=yes)\newline
+C_previous - What the customer formerly had or currently has for product option C (0=nothing, 1, 2, 3,4)\newline
+duration_previous -  how long (in years) the customer was covered by their previous issuer\newline
+A,B,C,D,E,F,G - the coverage options\newline
+cost - cost of the quoted coverage options\newline
+
+##Explanation with the Customer ID
+
+As a customer shops an insurance policy, he/she will receive a number of quotes with different coverage options before purchasing a plan. For example, from the data above, a customer with ID 10000000 recieved nine quote and purchased the last one.
+
+```{r}
+#Select quotes which customer purchased
+purchase <- train%>%
+  filter(record_type == 1)
+first3 <- head(purchase, n=3)
+kable(first3)
+
+ggplot(purchase, aes(x=shopping_pt)) +geom_bar(fill = "#FF9966")+ ggtitle("Figure 2.1: Number of quotes until purchase") + xlab("Number of quotes") +ylab("Count")
+
+```
+
+Each customer has many shopping points, where a shopping point is defined by a customer with certain characteristics viewing a product and its associated cost at a particular time. The data related to customers have these characteristics: \newline
+1) Some customer characteristics may change over time (e.g. as the customer changes or provides new information), and the cost depends on both the product and the customer characteristics. \newline
+2) A customer may represent a collection of people, as policies can cover more than one person. \newline
+3) A customer may purchase a product that was not viewed.\newline
+
+##Explanation of the option
+
+# 3. Goal and Method
+Analysing the variables and their relationship between each other, also the relationship with the final decision of customers. At the end I want to predict the probability a customer will purchase the insurace after one quote.\newline
+
+Here are severl steps I will use to archive my goal:\newline
+1) Use EDA to get a deeper understanding for my variables;\newline
+2) Fit a generalized linear model with random effect to find the relationship between option C and previous option C;\newline
+3) Fit a generalized linear model to predict the probability of a customer purchase the insurance after one quote.
+
+# 4. EDA
+
+Before I fit the model, I did some visualizations to help me understand the data.
+
+## 4.1 Purchased option choice.
+```{r}
+ggplot(train, aes(factor(record_type), fill=factor(record_type)))+geom_bar(width = 0.2, show.legend = F) + labs(title = "Figure 4.1 Proportion between purchased/non-purchased",x = "record type")
+
+```
+For this figure we can find that most of customers need more than five quote before finally purchase. Insurance company will easily loose customers during this process.
+
+## 4.2 Histogram of the distribution for each options
+```{r}
+par(mfrow=c(3,2))
+hist(purchase$A)
+hist(purchase$B)
+hist(purchase$C)
+hist(purchase$D)
+hist(purchase$E)
+hist(purchase$F)
+
+```
+From the figure above I found that customers has not much difference in choosing each options. (No preferece in certain one option.) But for option A, most of the customers choose 1; for option D, most of the custormers choose 3.
+
+
+
+##4.3 Comparasion of option C-previous and option C
+```{r}
+optionc_1 <- purchase %>%
+  group_by(C_previous) %>%
+  count(C)
+
+ggplot()+geom_bar(optionc_1, mapping=aes(x=factor(C_previous), y=n, fill=factor(C)),stat = "identity", position="fill", alpha=0.7) + labs(title="Figure4.3 The percentage of option C for each C-previous", x= "", y="Percentage")
+```
+From this figure, we can find that for customer who chose option 1 in C before, will mostly choose option 1 in C thereafter, so as other 3 otpions.  
+
+## 4.4 Scatter plot for characteristics of customer.
+```{r}
+age.fig1 <- ggplot(purchase) + geom_jitter(aes(x = age_oldest, y = cost),color = "gray") + geom_smooth(aes(x = age_oldest, y = cost), method = "lm",color = "navy") + geom_point(aes(x = age_youngest, y = cost),color = "pink") + geom_smooth(aes(x = age_youngest, y = cost), method = "lm",color = "orange")
+age.fig2 <- ggplot(purchase) + geom_jitter(aes(x = car_value, y = cost),color = "gray") + geom_smooth(aes(x = car_value, y = cost), method = "lm",color = "orange")
+age.fig3 <- ggplot(purchase) + geom_jitter(aes(x = car_age, y = cost),color = "gray") + geom_smooth(aes(x = car_age, y = cost), method = "lm",color = "orange")
+age.fig4 <- ggplot(purchase) + geom_jitter(aes(x = risk_factor, y = cost),color = "gray") + geom_smooth(aes(x = risk_factor, y = cost), method = "lm",color = "orange")
+
+title3=textGrob("Figure 4.4: Scatter plot for characteristics of customer", gp=gpar(fontsize=15,font=3))
+grid.arrange(age.fig1, age.fig2, age.fig3, age.fig4, top=title3)
+```
+From Figure 4.4 I found that the insurance cost will lightly increase while car_value and risk factor increased, the insurance cost will lightly decrease while age_oldest increase. Also the cost has very obvious decreasing while the car_age is increased.
+
+
+## 4.5 Number of customers in each state
+```{r, warning=FALSE}
+state_count<- purchase %>%
+  count(state)
+state_count[37:49,1] <- c("AZ","CA","LA","MA","MN","MI","NV","NC","SC","TX","VT","VA","IL")
+
+for (i in 1:48) {
+  state_count$state [i]<- tolower(state.name[match(state_count$state[i], state.abb)])
+}
+colnames(state_count)[2] <- "numberofcustomer"
+
+us <- map_data("state") 
+gg <- ggplot()
+gg <- gg + geom_map(data=us, map=us,
+                    aes(x=long, y=lat, map_id=region),
+                    fill="#ffffff", color="white", size=0.15)
+gg <- gg + geom_map(data=state_count, map=us,
+                    aes(fill=numberofcustomer, map_id=state),
+                    color="#ffffff", size=0.15)
+gg <- gg + scale_fill_continuous(low='thistle2', high='darkred', 
+                                 guide='colorbar')
+gg <- gg + labs(x=NULL, y=NULL) + coord_map("albers", lat0 = 39, lat1 = 45) + theme(panel.border = element_blank()) + theme(panel.background = element_blank()) + theme(axis.ticks = element_blank()) + theme(axis.text = element_blank())+ ggtitle("Figure 4.5  Chloropleth map of amount of customer in each states")
+gg
+
+
+```
+From figure 4.5 we can see there is a large difference between the number of customers in each state. Thus for next step I will put state as a radom effect for the multilevel generalized linear model.
+
+# 4. Model Analysis
+##4.1 Multilevel linear model for option C
+There is one column called C_previous which is each customer's previous choice on option C. I assume this variable is somehow important to my prediction and want to analyse this variable first. I want to find out the relationship between the option C each customer finally chose with the option C they chosen before. Here is the model I want to fit:
+
+$C_i = Group\_Size_{j[i]} + State_{k[i]} + Car\_Value_i + Risk\_Factor_i + Married\_Couple_i + C\_Previous_i + \epsilon_i$\newline
+$C_i \sim N(\mu_C,\sigma^2_C)$\newline
+$\epsilon_i \sim N(0,\sigma^2_C)$\newline
+$Group\_Size_j \sim N(\mu_{Group\_Size},\sigma^2_{Group\_Size})$\newline
+$State_k \sim N(\mu_{State},\sigma^2_{State})$
+
+
+```{r,warning=FALSE}
+#Fit the multilevel generalized linear model of option C with the predictor c_previous
+c_purchase1 <- glmer(C ~ car_value + risk_factor + C_previous + married_couple + (1 | state) + (1 | group_size), family = poisson()  ,data = purchase)
+summary(c_purchase1)
+
+#Fit the multilevel generalized linear model of option C without the predictor c_previous
+c_purchase2 <- glmer(C ~ car_value + risk_factor + married_couple + (1 | state) + (1 | group_size), family = poisson()  ,data = purchase)
+summary(c_purchase2)
+
+#Find the fitted value and residules of this two model
+y_hat.1 <- fitted.values(c_purchase1)
+res.1 <- resid(c_purchase1, type = "response")
+binnedplot(y_hat.1,res.1, main = "Figure 4.1: Binned residule plot for model 2")
+
+y_hat.2 <- fitted.values(c_purchase2)
+res.2 <- resid(c_purchase1, type = "response")
+binnedplot(y_hat.2,res.2, main = "Figure 4.1: Binned residule plot for model 2")
+
+anova(c_purchase1, c_purchase2)
+```
+1) From the comparasion of the residule plot for this two model, the second model is more accurate since the point is pretty symmetrically distributed, tending to cluster towards the middle of the plot.
+2) The AIC of the second model is larger than first one, shows this perspective the first model is more reasonable.
+3) From all of the output above, I can't conclude which model is better. Thus I will do both in my next step prediction.
+
+## 4.2 Logistical model for purchase prediction with previous c option
+
+Next I will predict the combination of the options by fit the data into multilevel logistic regression model with partial pooling. 
+$Prob(record\_type = 1) = logit^{-1}(Plan_{j[i]} + Duration\_Previous_i + shopping\_point_i + C\_Previous_i + \epsilon_i)$\newline
+$\epsilon_i \sim N(0,\sigma^2_C)$\newline
+$Plan_j \sim N(\mu_{Plan},\sigma^2_{Plan})$\newline
+
+
+```{r}
+train$plan <- paste0(train$A, train$B, train$C, train$D, train$E, train$F, train$G)
+train$plan <- as.factor(train$plan)
+
+#Random select 10000 rows of data, incase the dataset too large
+test <- train[sample(1:nrow(train), 10000,replace=FALSE),]
+
+predict.1 <- glmer(record_type ~ C_previous + duration_previous + shopping_pt  +(1 | plan), data=test, family = binomial, control = glmerControl(optimizer = "bobyqa"), nAGQ = 10)
+summary(predict.1)
+
+y_hat.3 <- fitted.values(predict.1)
+res.3 <- resid(predict.1, type = "response")
+binnedplot(y_hat.3,res.3) #Residual Plot for predict model
+
+coefs1 = as.data.frame(summary(predict.1)$coefficients[-1, ])
+names(coefs1)[2] = "se" 
+coefs1$vars = rownames(coefs1)
+for (i in 1:3){
+  coefs1$ylo[i]<-coefs1$Estimate[i] - 1.96*coefs1$se[i]
+  coefs1$yhi[i]<-coefs1$Estimate[i] + 1.96*coefs1$se[i]
+}
+ggplot(coefs1,aes(x=vars, y=Estimate, ymin= ylo,ymax= yhi)) + geom_pointrange(colour=ifelse(coefs1$ylo < 0 & coefs1$yhi > 0, "red", "blue")) + theme_bw()  + coord_flip()  + xlab('Variable') + ylab('')
+
+
+```
+
+```{r}
+predict.2 <- glmer(record_type ~ duration_previous + shopping_pt  +(1 | plan), data=test, family = binomial, control = glmerControl(optimizer = "bobyqa"), nAGQ = 10)
+summary(predict.2)
+
+y_hat.4 <- fitted.values(predict.2)
+res.4 <- resid(predict.2, type = "response")
+binnedplot(y_hat.4,res.4) #Residual Plot for predict model
+
+coefs2 = as.data.frame(summary(predict.2)$coefficients[-1, ])
+names(coefs2)[2] = "se" 
+coefs2$vars = rownames(coefs2)
+for (i in 1:2){
+  coefs2$ylo[i]<-coefs2$Estimate[i] - 1.96*coefs2$se[i]
+  coefs2$yhi[i]<-coefs2$Estimate[i] + 1.96*coefs2$se[i]
+}
+ggplot(coefs2,aes(x=vars, y=Estimate, ymin= ylo,ymax= yhi)) + geom_pointrange(colour=ifelse(coefs2$ylo < 0 & coefs2$yhi > 0, "red", "blue")) + theme_bw()  + coord_flip()  + xlab('Variable') + ylab('')
+
+```
+After comparing these two predictive logistic model, the first model has a residule plot more symmetric and lower AIC. Thus I will choose first model for prediction.
+
+```{r}
+predict1 <- data.frame(predict(predict.1,type="response" ))
+names(predict1)[1]="predict_value"
+summary(predict1)
+ggplot(predict1,aes(predict_value))+geom_density(alpha=0.3)+labs(title = "Desity plot for the predictive purchase probability")
+```
+
+
+# 5. Conclusion
+From the logistic model above I found that move from option 1 to option 2 in C_previous will increase mostly 0.4% the probability for a customoer purchase this insurance. The probablity will also increase at most 15% after one more quote, and increase at most 0.0675% after add one year in previous insurance age. In my prediction the most likely probability the customer will purchase this insurance is around 2%.
+
+## Limidation
+This dataset is not complete and lack the data for those customors who end up without purchase any insurance, thus I can not fit an accurate model and make prediction from it. Also there is limitation for my analyse since I don't know what each option is so that I have problem in choosing predictor for my model.
+
